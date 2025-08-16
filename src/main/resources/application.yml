@@ -1,0 +1,8 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: spotify_player
+
+# Schritt 2: Hier kommen spotify client-id/secret + OAuth2 provider/registration rein.
