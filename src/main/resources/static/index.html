@@ -5,38 +5,100 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Spotify MusicPlayer</title>
 
-    <!-- Tailwind (CDN, für schnellen Start) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Alpine.js -->
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-    <link rel="icon" href="data:," />
+    <!-- Spotify Web Playback SDK -->
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
   </head>
   <body class="min-h-screen bg-slate-900 text-slate-100">
-    <div class="max-w-4xl mx-auto p-6">
+    <div class="max-w-4xl mx-auto p-6" x-data="spotifyPlayer()" x-init="init()">
       <header class="mb-8">
         <h1 class="text-3xl font-bold">🎵 Mein Spotify MusicPlayer</h1>
-        <p class="text-slate-300">Schritt 1: Projekt steht. In Schritt 2 verbinden wir Spotify.</p>
+        <p class="text-slate-300">Mit Spotify verbinden und Songs abspielen.</p>
       </header>
 
-      <main x-data="{ loading: false }" class="space-y-6">
+      <main class="space-y-6">
         <div class="rounded-2xl bg-slate-800/60 p-6 shadow">
-          <p class="mb-4">Hier entsteht dein Player-UI mit Tailwind & Alpine.</p>
-
-          <!-- Dieser Button wird in Schritt 2 "echt" (OAuth Login zu Spotify) -->
           <button
             class="rounded-2xl px-5 py-3 bg-emerald-500 hover:bg-emerald-600 transition shadow"
-            @click="alert('In Schritt 2 aktivieren wir Spotify Login ✨')">
+            @click="login">
             Mit Spotify verbinden
           </button>
         </div>
-      </main>
 
-      <footer class="mt-10 text-sm text-slate-400">
-        Dev-Mode: Änderungen an HTML/JS speichern → Seite neu laden.
-      </footer>
+        <div class="rounded-2xl bg-slate-800/60 p-6 shadow">
+          <button
+            class="rounded-2xl px-5 py-3 bg-blue-500 hover:bg-blue-600 transition shadow"
+            @click="playSample">
+            ▶ Beispiel-Song abspielen
+          </button>
+        </div>
+      </main>
     </div>
 
-    <script src="/js/app.js"></script>
+    <script>
+      function spotifyPlayer() {
+        return {
+          token: null,
+          player: null,
+          deviceId: null,
+
+          init() {
+            // Token aus URL übernehmen
+            const params = new URLSearchParams(window.location.search);
+            this.token = params.get("access_token");
+            if (this.token) {
+              this.initPlayer();
+            }
+          },
+
+          async login() {
+            // Spring Boot Auth-Flow starten
+            window.location.href = "/login";
+          },
+
+          async initPlayer() {
+            window.onSpotifyWebPlaybackSDKReady = () => {
+              this.player = new Spotify.Player({
+                name: 'Mein Web Player',
+                getOAuthToken: cb => { cb(this.token); },
+                volume: 0.5
+              });
+
+              this.player.addListener('ready', ({ device_id }) => {
+                console.log('Player bereit mit ID', device_id);
+                this.deviceId = device_id;
+              });
+
+              this.player.addListener('not_ready', ({ device_id }) => {
+                console.log('Gerät nicht bereit', device_id);
+              });
+
+              this.player.connect();
+            };
+          },
+
+          async playSample() {
+            if (!this.deviceId) {
+              alert("Player noch nicht bereit");
+              return;
+            }
+
+            // Beispiel-Track (Ed Sheeran - Shape of You)
+            const trackUri = "spotify:track:7qiZfU4dY1lWllzX7mPBI3";
+
+            await fetch("https://api.spotify.com/v1/me/player/play?device_id=" + this.deviceId, {
+              method: "PUT",
+              body: JSON.stringify({ uris: [trackUri] }),
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + this.token
+              }
+            });
+          }
+        }
+      }
+    </script>
   </body>
 </html>
