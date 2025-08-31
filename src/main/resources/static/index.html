@@ -19,11 +19,21 @@
       </header>
 
       <main class="space-y-6">
-        <div class="rounded-2xl bg-slate-800/60 p-6 shadow">
+         <div class="rounded-2xl bg-slate-800/60 p-6 shadow">
+          <!-- Login-Button nur anzeigen, wenn kein Token -->
           <button
+            x-show="!token"
             class="rounded-2xl px-5 py-3 bg-emerald-500 hover:bg-emerald-600 transition shadow"
             @click="login">
             Mit Spotify verbinden
+          </button>
+
+          <!-- Logout-Button nur anzeigen, wenn eingeloggt -->
+          <button
+            x-show="token"
+            class="rounded-2xl px-5 py-3 bg-red-500 hover:bg-red-600 transition shadow"
+            @click="logout">
+            Abmelden
           </button>
         </div>
 
@@ -32,6 +42,12 @@
             class="rounded-2xl px-5 py-3 bg-blue-500 hover:bg-blue-600 transition shadow"
             @click="playSample">
             ▶ Beispiel-Song abspielen
+          </button>
+
+          <button
+            class="rounded-2xl px-5 py-3 bg-yellow-500 hover:bg-yellow-600 transition shadow"
+            @click="pause">
+            ⏸ Pause
           </button>
         </div>
       </main>
@@ -58,6 +74,27 @@
             window.location.href = "/login";
           },
 
+          logout() {
+            // Token löschen
+            this.token = null;
+            localStorage.removeItem("spotify_token");
+            window.location.href = "/"; // zurück zur Startseite
+          },
+
+          async pause() {
+            if (!this.deviceId) {
+              alert("Player noch nicht bereit");
+              return;
+            }
+
+            await fetch("https://api.spotify.com/v1/me/player/pause?device_id=" + this.deviceId, {
+              method: "PUT",
+              headers: {
+                "Authorization": "Bearer " + this.token
+              }
+            });
+          },
+          
           async initPlayer() {
             window.onSpotifyWebPlaybackSDKReady = () => {
               this.player = new Spotify.Player({
