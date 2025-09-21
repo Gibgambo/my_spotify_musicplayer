@@ -13,41 +13,78 @@
   </head>
   <body class="min-h-screen bg-slate-900 text-slate-100">
     <div class="max-w-4xl mx-auto p-6" x-data="spotifyPlayer()" x-init="init()">
-      <header class="mb-8">
-        <h1 class="text-3xl font-bold">🎵 Mein Spotify MusicPlayer</h1>
-        <p class="text-slate-300">Mit Spotify verbinden und Songs abspielen.</p>
-      </header>
 
-      <main class="space-y-6">
-         <div class="rounded-2xl bg-slate-800/60 p-6 shadow">
+      <!-- Header mit Status rechts -->
+      <header class="mb-8 flex justify-between items-center">
+        <div>
+          <h1 class="text-3xl font-bold">🎵 Mein Spotify MusicPlayer</h1>
+          <p class="text-slate-300">Mit Spotify verbinden und Songs abspielen.</p>
+        </div>
+
+        <!-- Login / Logout Status -->
+        <div>
           <!-- Login-Button nur anzeigen, wenn kein Token -->
           <button
             x-show="!token"
-            class="rounded-2xl px-5 py-3 bg-emerald-500 hover:bg-emerald-600 transition shadow"
+            class="rounded-2xl px-4 py-2 bg-emerald-500 hover:bg-emerald-600 transition shadow"
             @click="login">
-            Mit Spotify verbinden
+            Login
           </button>
 
-          <!-- Logout-Button nur anzeigen, wenn eingeloggt -->
+          <!-- Logout-Button mit Status -->
+          <div x-show="token" class="flex items-center space-x-3">
+            <span class="text-slate-300">✅ Eingeloggt</span>
+            <button
+              class="rounded-2xl px-4 py-2 bg-red-500 hover:bg-red-600 transition shadow"
+              @click="logout">
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Hauptbereich nur sichtbar wenn eingeloggt -->
+      <main class="space-y-6" x-show="token">
+        <div class="rounded-2xl bg-slate-800/60 p-6 shadow">
+          <!-- Dynamischer Play/Pause Button -->
           <button
-            x-show="token"
-            class="rounded-2xl px-5 py-3 bg-red-500 hover:bg-red-600 transition shadow"
-            @click="logout">
-            Abmelden
+            class="rounded-2xl px-5 py-3 bg-blue-500 hover:bg-blue-600 transition shadow"
+            @click="togglePlay">
+            <span x-text="isPlaying ? '⏸ Pause' : '▶ Abspielen'"></span>
           </button>
         </div>
 
-        <div class="rounded-2xl bg-slate-800/60 p-6 shadow">
+        <div class="rounded-2xl bg-slate-800/60 p-6 shadow" x-show="currentTrack">
+          <div class="flex items-center space-x-4">
+            <img :src="currentTrack.albumImage" alt="Cover" class="w-16 h-16 rounded-xl">
+            <div>
+              <h2 class="text-xl font-bold" x-text="currentTrack.name"></h2>
+              <p class="text-slate-300" x-text="currentTrack.artist"></p>
+              <p class="text-sm text-slate-400">
+                <span x-text="formatTime(progressMs)"></span> /
+                <span x-text="formatTime(currentTrack.duration)"></span>
+              </p>
+              <div class="mt-4">
+                <input type="range" min="0" max="1" step="0.01"
+                      x-model="volume"
+                      @input="setVolume($event.target.value)"
+                      class="w-full">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-2xl bg-slate-800/60 p-6 shadow space-x-4">
           <button
-            class="rounded-2xl px-5 py-3 bg-blue-500 hover:bg-blue-600 transition shadow"
-            @click="playSample">
-            ▶ Beispiel-Song abspielen
+            class="rounded-2xl px-5 py-3 bg-purple-500 hover:bg-purple-600 transition shadow"
+            @click="playPlaylist(playlists.torparade)">
+            ▶ Torparade
           </button>
 
           <button
-            class="rounded-2xl px-5 py-3 bg-yellow-500 hover:bg-yellow-600 transition shadow"
-            @click="pause">
-            ⏸ Pause
+            class="rounded-2xl px-5 py-3 bg-pink-500 hover:bg-pink-600 transition shadow"
+            @click="playPlaylist(playlists.zweiMinGegner)">
+            ▶ 2 Minuten Gegner
           </button>
         </div>
       </main>
@@ -59,6 +96,16 @@
           token: null,
           player: null,
           deviceId: null,
+          currentTrack: null,
+          progressMs: 0,
+          isPlaying: false,
+          progressTimer: null,
+          volume: 0.5,
+
+          playlists: {
+            torparade: "spotify:playlist:3hZbMca6B5Xf6xpFr9fvcA",
+            zweiMinGegner: "spotify:playlist:74o9YW1Q7GMzFliaBJxFam"
+          },
 
           init() {
             // Token aus URL übernehmen
@@ -112,27 +159,68 @@
                 console.log('Gerät nicht bereit', device_id);
               });
 
+              this.player.addListener('player_state_changed', state => {
+                if (!state) return;
+                this.isPlaying = !state.paused;
+                this.progressMs = state.position;
+
+                const track = state.track_window.current_track;
+                this.currentTrack = {
+                  name: track.name,
+                  artist: track.artists.map(a => a.name).join(", "),
+                  albumImage: track.album.images[0].url,
+                  duration: track.duration_ms
+                };
+
+                // Timer für Fortschritt starten/stoppen
+                clearInterval(this.progressTimer);
+                if (this.isPlaying) {
+                  this.progressTimer = setInterval(() => {
+                    this.progressMs += 1000;
+                    if (this.progressMs >= this.currentTrack.duration) {
+                      clearInterval(this.progressTimer);
+                    }
+                  }, 1000);
+                }
+              });
+
               this.player.connect();
             };
           },
 
-          async playSample() {
+          async togglePlay() {
+              if (!this.deviceId) {
+                alert("Player noch nicht bereit");
+                return;
+              }
+              await this.player.togglePlay();
+          },
+
+          async playPlaylist(playlistUri) {
             if (!this.deviceId) {
               alert("Player noch nicht bereit");
               return;
             }
 
-            // Beispiel-Track (Ed Sheeran - Shape of You)
-            const trackUri = "spotify:track:7qiZfU4dY1lWllzX7mPBI3";
-
             await fetch("https://api.spotify.com/v1/me/player/play?device_id=" + this.deviceId, {
               method: "PUT",
-              body: JSON.stringify({ uris: [trackUri] }),
+              body: JSON.stringify({ context_uri: playlistUri }),
               headers: {
                 "Content-Type": "application/json",
                 "Authorization": "Bearer " + this.token
               }
             });
+          },
+          formatTime(ms) {
+            const minutes = Math.floor(ms / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000).toString().padStart(2, "0");
+            return `${minutes}:${seconds}`;
+          },
+          async setVolume(value) {
+            this.volume = value;
+            if (this.player) {
+              await this.player.setVolume(parseFloat(value));
+            }
           }
         }
       }
