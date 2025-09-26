@@ -1,229 +1,134 @@
 <!doctype html>
 <html lang="de">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Spotify MusicPlayer</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spotify MusicPlayer</title>
 
-    <!-- Spotify Web Playback SDK -->
-    <script src="https://sdk.scdn.co/spotify-player.js"></script>
-  </head>
-  <body class="min-h-screen bg-slate-900 text-slate-100">
-    <div class="max-w-4xl mx-auto p-6" x-data="spotifyPlayer()" x-init="init()">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Spotify Web Playback SDK -->
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
 
-      <!-- Header mit Status rechts -->
-      <header class="mb-8 flex justify-between items-center">
-        <div>
-          <h1 class="text-3xl font-bold">🎵 Mein Spotify MusicPlayer</h1>
-          <p class="text-slate-300">Mit Spotify verbinden und Songs abspielen.</p>
+  <script src="js/app.js"></script>
+
+</head>
+
+<body class="min-h-screen bg-slate-900 text-slate-100">
+  <div class="max-w-4xl mx-auto p-6" x-data="spotifyPlayer()" x-init="init()">
+
+    <!-- Header mit Status rechts -->
+    <header class="mb-8 flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-bold">🎵 Mein Spotify HandballPlayer</h1>
+        <p class="text-slate-300">Mit Spotify verbinden und Songs abspielen.</p>
+      </div>
+
+      <!-- Login / Logout Status -->
+      <div>
+        <!-- Login-Button nur anzeigen, wenn kein Token -->
+        <button x-show="!token" class="rounded-2xl px-4 py-2 bg-emerald-500 hover:bg-emerald-600 transition shadow"
+          @click="login">
+          Login
+        </button>
+
+        <!-- Logout-Button mit Status -->
+        <div x-show="token" class="flex items-center space-x-3">
+          <span class="text-slate-300">✅ Eingeloggt</span>
+          <button class="rounded-2xl px-4 py-2 bg-red-500 hover:bg-red-600 transition shadow" @click="logout">
+            Logout
+          </button>
         </div>
+      </div>
+    </header>
 
-        <!-- Login / Logout Status -->
-        <div>
-          <!-- Login-Button nur anzeigen, wenn kein Token -->
-          <button
-            x-show="!token"
-            class="rounded-2xl px-4 py-2 bg-emerald-500 hover:bg-emerald-600 transition shadow"
-            @click="login">
-            Login
+    <!-- Hauptbereich nur sichtbar wenn eingeloggt -->
+    <main class="space-y-6" x-show="token">
+      <!-- Aktueller Track Bereich -->
+      <div class="rounded-2xl bg-slate-800/60 p-6 shadow" x-show="currentTrack.name != ''">
+        <!-- Steuerbuttons oben -->
+        <div class="flex justify-center items-center space-x-6 mb-4">
+          <!-- Back -->
+          <button class="rounded-full bg-slate-700 hover:bg-slate-600 p-3 shadow" @click="previousTrack">
+            ⏮
           </button>
 
-          <!-- Logout-Button mit Status -->
-          <div x-show="token" class="flex items-center space-x-3">
-            <span class="text-slate-300">✅ Eingeloggt</span>
-            <button
-              class="rounded-2xl px-4 py-2 bg-red-500 hover:bg-red-600 transition shadow"
-              @click="logout">
-              Logout
-            </button>
+          <!-- Play/Pause -->
+          <button class="rounded-full bg-blue-500 hover:bg-blue-600 p-4 shadow" @click="togglePlay">
+            <span x-text="isPlaying ? '⏸' : '▶'"></span>
+          </button>
+
+          <!-- Next -->
+          <button class="rounded-full bg-slate-700 hover:bg-slate-600 p-3 shadow" @click="nextTrack">
+            ⏭
+          </button>
+        </div>
+
+        <!-- Track Info + Album Cover -->
+        <div class="flex items-center space-x-4">
+          <img :src="currentTrack.albumImage" alt="Cover" class="w-16 h-16 rounded-xl">
+          <div class="flex-1">
+            <h2 class="text-xl font-bold" x-text="currentTrack.name"></h2>
+            <p class="text-slate-300" x-text="currentTrack.artist"></p>
+            <p class="text-sm text-slate-400">
+              <span x-text="formatTime(progressMs)"></span> /
+              <span x-text="formatTime(currentTrack.duration)"></span>
+            </p>
+
+            <!-- Fortschrittsbalken -->
+            <input type="range" min="0" :max="currentTrack.duration" step="1000" :value="progressMs"
+              @mousedown="isSeeking = true" @touchstart="isSeeking = true" @input="progressMs = $event.target.value"
+              @mouseup="isSeeking = false; seek($event.target.value)"
+              @touchend="isSeeking = false; seek($event.target.value)"
+              class="w-full h-2 mt-2 rounded-lg accent-emerald-500">
           </div>
-        </div>
-      </header>
 
-      <!-- Hauptbereich nur sichtbar wenn eingeloggt -->
-      <main class="space-y-6" x-show="token">
-        <div class="rounded-2xl bg-slate-800/60 p-6 shadow">
-          <!-- Dynamischer Play/Pause Button -->
-          <button
-            class="rounded-2xl px-5 py-3 bg-blue-500 hover:bg-blue-600 transition shadow"
-            @click="togglePlay">
-            <span x-text="isPlaying ? '⏸ Pause' : '▶ Abspielen'"></span>
-          </button>
-        </div>
+          <!-- Lautstärke -->
+          <div class="flex flex-col items-center space-y-2 ml-4">
+            <div class="flex items-center space-x-2">
+              <!-- Lautstärke Icon -->
+              <button @click="toggleMute" class="focus:outline-none">
+                <template x-if="!isMuted">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-300" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5L6 9H2v6h4l5 4V5z" />
+                  </svg>
+                </template>
+                <template x-if="isMuted">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-300" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M11 5L6 9H2v6h4l5 4V5zM19 5l-6 6m0-6l6 6" />
+                  </svg>
+                </template>
+              </button>
 
-        <div class="rounded-2xl bg-slate-800/60 p-6 shadow" x-show="currentTrack">
-          <div class="flex items-center space-x-4">
-            <img :src="currentTrack.albumImage" alt="Cover" class="w-16 h-16 rounded-xl">
-            <div>
-              <h2 class="text-xl font-bold" x-text="currentTrack.name"></h2>
-              <p class="text-slate-300" x-text="currentTrack.artist"></p>
-              <p class="text-sm text-slate-400">
-                <span x-text="formatTime(progressMs)"></span> /
-                <span x-text="formatTime(currentTrack.duration)"></span>
-              </p>
-              <div class="mt-4">
-                <input type="range" min="0" max="1" step="0.01"
-                      x-model="volume"
-                      @input="setVolume($event.target.value)"
-                      class="w-full">
-              </div>
+              <input type="range" min="0" max="1" step="0.01" x-model="volume" @input="setVolume($event.target.value)"
+                class="w-24 h-1 rounded-lg accent-emerald-500">
             </div>
           </div>
         </div>
+      </div>
+
 
         <div class="rounded-2xl bg-slate-800/60 p-6 shadow space-x-4">
-          <button
-            class="rounded-2xl px-5 py-3 bg-purple-500 hover:bg-purple-600 transition shadow"
+          <button class="rounded-2xl px-5 py-3 bg-purple-500 hover:bg-purple-600 transition shadow"
             @click="playPlaylist(playlists.torparade)">
             ▶ Torparade
           </button>
 
-          <button
-            class="rounded-2xl px-5 py-3 bg-pink-500 hover:bg-pink-600 transition shadow"
+          <button class="rounded-2xl px-5 py-3 bg-pink-500 hover:bg-pink-600 transition shadow"
             @click="playPlaylist(playlists.zweiMinGegner)">
             ▶ 2 Minuten Gegner
           </button>
-        </div>
-      </main>
-    </div>
-
-    <script>
-      function spotifyPlayer() {
-        return {
-          token: null,
-          player: null,
-          deviceId: null,
-          currentTrack: null,
-          progressMs: 0,
-          isPlaying: false,
-          progressTimer: null,
-          volume: 0.5,
-
-          playlists: {
-            torparade: "spotify:playlist:3hZbMca6B5Xf6xpFr9fvcA",
-            zweiMinGegner: "spotify:playlist:74o9YW1Q7GMzFliaBJxFam"
-          },
-
-          init() {
-            // Token aus URL übernehmen
-            const params = new URLSearchParams(window.location.search);
-            this.token = params.get("access_token");
-            if (this.token) {
-              this.initPlayer();
-            }
-          },
-
-          async login() {
-            // Spring Boot Auth-Flow starten
-            window.location.href = "/login";
-          },
-
-          logout() {
-            // Token löschen
-            this.token = null;
-            localStorage.removeItem("spotify_token");
-            window.location.href = "/"; // zurück zur Startseite
-          },
-
-          async pause() {
-            if (!this.deviceId) {
-              alert("Player noch nicht bereit");
-              return;
-            }
-
-            await fetch("https://api.spotify.com/v1/me/player/pause?device_id=" + this.deviceId, {
-              method: "PUT",
-              headers: {
-                "Authorization": "Bearer " + this.token
-              }
-            });
-          },
           
-          async initPlayer() {
-            window.onSpotifyWebPlaybackSDKReady = () => {
-              this.player = new Spotify.Player({
-                name: 'Mein Web Player',
-                getOAuthToken: cb => { cb(this.token); },
-                volume: 0.5
-              });
-
-              this.player.addListener('ready', ({ device_id }) => {
-                console.log('Player bereit mit ID', device_id);
-                this.deviceId = device_id;
-              });
-
-              this.player.addListener('not_ready', ({ device_id }) => {
-                console.log('Gerät nicht bereit', device_id);
-              });
-
-              this.player.addListener('player_state_changed', state => {
-                if (!state) return;
-                this.isPlaying = !state.paused;
-                this.progressMs = state.position;
-
-                const track = state.track_window.current_track;
-                this.currentTrack = {
-                  name: track.name,
-                  artist: track.artists.map(a => a.name).join(", "),
-                  albumImage: track.album.images[0].url,
-                  duration: track.duration_ms
-                };
-
-                // Timer für Fortschritt starten/stoppen
-                clearInterval(this.progressTimer);
-                if (this.isPlaying) {
-                  this.progressTimer = setInterval(() => {
-                    this.progressMs += 1000;
-                    if (this.progressMs >= this.currentTrack.duration) {
-                      clearInterval(this.progressTimer);
-                    }
-                  }, 1000);
-                }
-              });
-
-              this.player.connect();
-            };
-          },
-
-          async togglePlay() {
-              if (!this.deviceId) {
-                alert("Player noch nicht bereit");
-                return;
-              }
-              await this.player.togglePlay();
-          },
-
-          async playPlaylist(playlistUri) {
-            if (!this.deviceId) {
-              alert("Player noch nicht bereit");
-              return;
-            }
-
-            await fetch("https://api.spotify.com/v1/me/player/play?device_id=" + this.deviceId, {
-              method: "PUT",
-              body: JSON.stringify({ context_uri: playlistUri }),
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + this.token
-              }
-            });
-          },
-          formatTime(ms) {
-            const minutes = Math.floor(ms / 60000);
-            const seconds = Math.floor((ms % 60000) / 1000).toString().padStart(2, "0");
-            return `${minutes}:${seconds}`;
-          },
-          async setVolume(value) {
-            this.volume = value;
-            if (this.player) {
-              await this.player.setVolume(parseFloat(value));
-            }
-          }
-        }
-      }
-    </script>
-  </body>
+          <button class="rounded-2xl px-5 py-3 bg-amber-500 hover:bg-amber-600 transition shadow"
+            @click="playPlaylist(playlists.einlaufmusik)">
+            ▶ Einlaufmusik
+          </button>
+        </div>
+    </main>
+  </div>
+</body>
 </html>
