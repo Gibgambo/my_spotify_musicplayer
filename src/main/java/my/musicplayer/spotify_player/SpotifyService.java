@@ -21,6 +21,11 @@ public class SpotifyService {
     }
 
     public ResponseEntity<String> sendSpotifyRequest(String url, HttpMethod method) {
+        return sendSpotifyRequest(url, method, null);
+    }
+
+
+    public ResponseEntity<String> sendSpotifyRequest(String url, HttpMethod method, String body) {
         if (accessToken == null) {
             return ResponseEntity.badRequest().body("Kein Token gespeichert!");
         }
@@ -28,8 +33,9 @@ public class SpotifyService {
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
+        headers.set("Content-Type", "application/json");
 
-        HttpEntity<String> request = new HttpEntity<>(headers);
+        HttpEntity<String> request = new HttpEntity<>(body, headers);
         return restTemplate.exchange(url, method, request, String.class);
     }
 }

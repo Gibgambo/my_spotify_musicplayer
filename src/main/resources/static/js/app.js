@@ -27,7 +27,6 @@ function spotifyPlayer() {
         },
 
         init() {
-            // Token aus URL übernehmen
             const params = new URLSearchParams(window.location.search);
             this.token = params.get("access_token");
             if (this.token) {
@@ -45,20 +44,6 @@ function spotifyPlayer() {
             this.token = null;
             localStorage.removeItem("spotify_token");
             window.location.href = "/"; // zurück zur Startseite
-        },
-
-        async pause() {
-            if (!this.deviceId) {
-                alert("Player noch nicht bereit");
-                return;
-            }
-
-            await fetch("https://api.spotify.com/v1/me/player/pause?device_id=" + this.deviceId, {
-                method: "PUT",
-                headers: {
-                    "Authorization": "Bearer " + this.token
-                }
-            });
         },
 
         async initPlayer() {
@@ -104,76 +89,54 @@ function spotifyPlayer() {
             };
         },
 
-        startProgressTimer() {
-            clearInterval(this.progressTimer);
-            this.progressTimer = setInterval(() => {
-                this.progressMs += 1000;
-                if (this.progressMs >= this.currentTrack.duration) {
-                    clearInterval(this.progressTimer);
-                }
-            }, 1000);
-        },
-
-
-        async togglePlay() {
-            if (!this.deviceId) {
-                alert("Player noch nicht bereit");
-                return;
-            }
-            await this.player.togglePlay();
-        },
-
         async playPlaylist(playlistUri) {
-            if (!this.deviceId) {
-                alert("Player noch nicht bereit");
-                return;
-            }
-
-            await fetch("https://api.spotify.com/v1/me/player/play?device_id=" + this.deviceId, {
-                method: "PUT",
-                body: JSON.stringify({ context_uri: playlistUri }),
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer " + this.token
-                }
+            if (!this.deviceId) return alert("Player noch nicht bereit");
+            const res = await fetch("/player/play", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ context_uri: playlistUri, device_id: this.deviceId })
             });
         },
+
+        async seek(positionMs) {
+            if (!this.deviceId) return;
+            await fetch(`/player/seek?device_id=${this.deviceId}&position_ms=${positionMs}`, { method: "POST" });
+            this.progressMs = positionMs;
+            if (this.isPlaying) this.startProgressTimer();
+        },
+
+        async setVolume(value) {
+            this.volume = value;
+            if (!this.deviceId) return;
+            const volumePercent = Math.round(value * 100); // 0-1 → 0-100
+            await fetch(`/player/volume?device_id=${this.deviceId}&volume_percent=${volumePercent}`, { method: "POST" });
+            if (this.player) await this.player.setVolume(parseFloat(value));
+        },
+
+        async pause() {
+            if (!this.deviceId) return;
+            await fetch(`/player/pause?device_id=${this.deviceId}`, { method: "POST" });
+            await this.player.pause();
+        },
+
+        async nextTrack() {
+            if (!this.deviceId) return;
+            await fetch(`/player/next?device_id=${this.deviceId}`, { method: "POST" });
+            await this.player.nextTrack();
+        },
+
+        async previousTrack() {
+            if (!this.deviceId) return;
+            await fetch(`/player/previous?device_id=${this.deviceId}`, { method: "POST" });
+            await this.player.previousTrack();
+        },
+
         formatTime(ms) {
             const minutes = Math.floor(ms / 60000);
             const seconds = Math.floor((ms % 60000) / 1000).toString().padStart(2, "0");
             return `${minutes}:${seconds}`;
         },
-        async setVolume(value) {
-            this.volume = value;
-            if (this.player) {
-                await this.player.setVolume(parseFloat(value));
-            }
-        },
-        async seek(positionMs) {
-            if (!this.deviceId) return;
-            await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${positionMs}&device_id=${this.deviceId}`, {
-                method: "PUT",
-                headers: {
-                    "Authorization": "Bearer " + this.token
-                }
-            });
-            this.progressMs = positionMs; // UI sofort updaten
-            if (this.isPlaying) this.startProgressTimer();
-        },
 
-        async previousTrack() {
-            if (!this.deviceId) return;
-            await fetch(`https://api.spotify.com/v1/me/player/previous?device_id=${this.deviceId}`, {
-                method: "POST",
-                headers: { "Authorization": "Bearer " + this.token }
-            });
-        }, async nextTrack() {
-            if (!this.deviceId) return;
-            await fetch(`https://api.spotify.com/v1/me/player/next?device_id=${this.deviceId}`, {
-                method: "POST",
-                headers: { "Authorization": "Bearer " + this.token }
-            });
-        },
         toggleMute() {
             if (!this.player) return;
             if (!this.isMuted) {
@@ -186,7 +149,25 @@ function spotifyPlayer() {
                 this.setVolume(this.previousVolume);
                 this.isMuted = false;
             }
-        }
+        },
+
+        startProgressTimer() {
+            clearInterval(this.progressTimer);
+            this.progressTimer = setInterval(() => {
+                this.progressMs += 1000;
+                if (this.progressMs >= this.currentTrack.duration) {
+                    clearInterval(this.progressTimer);
+                }
+            }, 1000);
+        },
+
+        async togglePlay() {
+            if (!this.deviceId) {
+                alert("Player noch nicht bereit");
+                return;
+            }
+            await this.player.togglePlay();
+        },
 
     }
 }
