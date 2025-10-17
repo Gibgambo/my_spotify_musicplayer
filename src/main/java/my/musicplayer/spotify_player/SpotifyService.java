@@ -1,6 +1,5 @@
 package my.musicplayer.spotify_player;
 
-
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -10,6 +9,7 @@ import org.springframework.web.client.RestTemplate;
 
 @Service
 public class SpotifyService {
+
     private String accessToken;
 
     public void setAccessToken(String token) {
@@ -20,10 +20,13 @@ public class SpotifyService {
         return this.accessToken;
     }
 
+    public void clearAccessToken() {
+        this.accessToken = null;
+    }
+
     public ResponseEntity<String> sendSpotifyRequest(String url, HttpMethod method) {
         return sendSpotifyRequest(url, method, null);
     }
-
 
     public ResponseEntity<String> sendSpotifyRequest(String url, HttpMethod method, String body) {
         if (accessToken == null) {

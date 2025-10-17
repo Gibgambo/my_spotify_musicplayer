@@ -50,7 +50,9 @@ public class SpotifyAuthController {
 
     // Prüft Basic Auth Header
     private boolean checkBasicAuth(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Basic ")) return false;
+        if (authHeader == null || !authHeader.startsWith("Basic ")) {
+            return false;
+        }
         String base64Credentials = authHeader.substring("Basic ".length());
         String credentials = new String(Base64.getDecoder().decode(base64Credentials));
         String[] parts = credentials.split(":", 2);
@@ -112,5 +114,28 @@ public class SpotifyAuthController {
         HttpHeaders redirectHeaders = new HttpHeaders();
         redirectHeaders.set("Location", "/?access_token=" + accessToken);
         return ResponseEntity.status(302).headers(redirectHeaders).build();
+    }
+
+    @GetMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (!checkBasicAuth(authHeader)) {
+            return ResponseEntity.status(401)
+                    .header("WWW-Authenticate", "Basic realm=\"Spotify Player\"")
+                    .build();
+        }
+
+        spotifyService.clearAccessToken();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Location", "/force-relogin");
+        return ResponseEntity.status(302).headers(headers).build();
+    }
+
+    @GetMapping("/force-relogin")
+    public ResponseEntity<Void> forceRelogin() {
+        return ResponseEntity.status(401)
+                .header("WWW-Authenticate", "Basic realm=\"Spotify Player Logout\"")
+                .build();
     }
 }

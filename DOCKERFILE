@@ -1,0 +1,14 @@
+# 1️⃣ Verwende ein kleines JDK-Image
+FROM openjdk:21-jdk-slim
+
+# 2️⃣ Arbeitsverzeichnis im Container
+WORKDIR /app
+
+# 3️⃣ Kopiere die fertige JAR aus dem Build
+COPY target/*.jar app.jar
+
+# 4️⃣ Exponiere Port 8080 (Render nutzt dynamische Ports)
+EXPOSE 8080
+
+# 5️⃣ Starte die Anwendung
+ENTRYPOINT ["java", "-Xmx384m", "-jar", "app.jar"]

@@ -28,12 +28,25 @@ function spotifyPlayer() {
 
         init() {
             const params = new URLSearchParams(window.location.search);
-            this.token = params.get("access_token");
+            const tokenFromUrl = params.get("access_token");
+
+            if (tokenFromUrl) {
+                // Token aus Callback speichern
+                localStorage.setItem("spotify_access_token", tokenFromUrl);
+                this.token = tokenFromUrl;
+
+                // URL bereinigen, damit Token nicht ewig sichtbar bleibt
+                window.history.replaceState({}, document.title, "/");
+            } else {
+                // Wenn kein Token in URL → aus LocalStorage laden
+                this.token = localStorage.getItem("spotify_access_token");
+            }
+
             if (this.token) {
                 this.initPlayer();
             }
         },
-
+        
         async login() {
             // Spring Boot Auth-Flow starten
             window.location.href = "/login";
@@ -42,8 +55,8 @@ function spotifyPlayer() {
         logout() {
             // Token löschen
             this.token = null;
-            localStorage.removeItem("spotify_token");
-            window.location.href = "/"; // zurück zur Startseite
+            localStorage.removeItem("spotify_access_token");
+            window.location.href = "/logout"; // zurück zur Startseite
         },
 
         async initPlayer() {
