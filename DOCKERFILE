@@ -1,14 +1,13 @@
-# 1️⃣ Verwende ein kleines JDK-Image
-FROM openjdk:21-jdk-slim
-
-# 2️⃣ Arbeitsverzeichnis im Container
+# 1️⃣ Build Stage (mit Maven)
+FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-# 3️⃣ Kopiere die fertige JAR aus dem Build
-COPY target/*.jar app.jar
-
-# 4️⃣ Exponiere Port 8080 (Render nutzt dynamische Ports)
+# 2️⃣ Run Stage (leichtes Image nur mit JAR)
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
-
-# 5️⃣ Starte die Anwendung
 ENTRYPOINT ["java", "-Xmx384m", "-jar", "app.jar"]
